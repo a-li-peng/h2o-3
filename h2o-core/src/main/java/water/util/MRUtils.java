@@ -9,7 +9,6 @@ import water.parser.BufferedString;
 
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashMap;
 import java.util.Random;
 
 import static water.util.RandomUtils.getRNG;
@@ -187,7 +186,7 @@ public class MRUtils {
       int numRows = chks[0].len();
       for (int index = 0; index < numRows; index++) {
         if (chks[_columnIndex].at8(index) == _value) {
-          _specialRows.add(chks[1].at8(index));
+          _specialRows.add(chks[2].at8(index));
           _numberAppear++;
         }
 
@@ -203,15 +202,25 @@ public class MRUtils {
     }
   }
 
-  public static ArrayList<Long> compareTwoList(ArrayList<Long> orig, ArrayList<Long> newL) {
-    ArrayList<Long> diffs = new ArrayList<Long>();
+  public static ArrayList<Integer> compareTwoList(ArrayList<Long> orig, ArrayList<Long> newL) {
+    int[] counters = new int[orig.size()];
 
     for (long val1:newL) {
-      if (!orig.contains(val1)) {
-        diffs.add(val1);
+      counters[(int) val1]++;
+    }
+    for (long val1:orig) {
+      counters[(int) val1]--;
+    }
+
+    ArrayList<Integer> duplicates = new ArrayList<>();
+
+    for (int index = 0; index < counters.length; index++) {
+      if (counters[index] != 0) {
+        System.out.println("row is "+index + " bad value is " + counters[index]);
+        duplicates.add(index);
       }
     }
-    return diffs;
+    return duplicates;
   }
 
   /**
@@ -252,19 +261,17 @@ public class MRUtils {
    * the rows are present by looking for this row indices.
    */
   public static class CountAllRowsPresented extends MRTask<CountAllRowsPresented> {
-    HashMap<Long, Integer> _counters;  // keep tracks of number of row indices
+    int[] _counters;  // keep tracks of number of row indices
     int _columnIndex;
-    ArrayList<Long> _badRows;
+    ArrayList<Integer> _badRows;
 
     public CountAllRowsPresented(int columnInd, Frame fr) {
       if (fr.vec(columnInd).isCategorical() || fr.vec(columnInd).isInt()) {
         _columnIndex = columnInd;
         long numRows = fr.numRows();
-        _counters = new HashMap<Long, Integer>();
-        _badRows = new ArrayList<Long>();
-        for (long index = 0; index < fr.numRows(); index++) {
-          _counters.put(index, 1);
-        }
+        _counters = new int[(int)numRows];
+        Arrays.fill(_counters, 1);
+        _badRows = new ArrayList<Integer>();
       } else {
         throw new IllegalArgumentException("The column data type must be categorical or integer.");
       }
@@ -274,17 +281,17 @@ public class MRUtils {
       int numRows = chks[0].len();
       for (int index = 0; index < numRows; index++) {
         long temp = chks[_columnIndex].at8(index);
-        _counters.put(temp, _counters.get(temp)-1);
+        _counters[(int)temp]--;
       }
     }
 
-    public ArrayList<Long> findMissingRows() {
+    public ArrayList<Integer> findMissingRows() {
       int numBad = 0;
-      for (long index=0; index < _counters.size(); index++) {
-        if (_counters.get(index) != 0) {
+      for (int index=0; index < _counters.length; index++) {
+        if (_counters[index] != 0) {
           numBad++;
           _badRows.add(index);
-          Log.info("Missing row "+index+" in final result with counter value "+_counters.get(index));
+          Log.info("Missing row "+index+" in final result with counter value "+_counters[index]);
         }
       }
       Log.info("Total number of problem rows: "+numBad);
